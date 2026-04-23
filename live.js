@@ -48,7 +48,9 @@ const app = {
   playerId: null,
   playerScore: 0,
   pollId: null,
+  uiTimer: null,
   shownQuestionIndex: null,
+  lastQuestionStartedAt: null,
   playerAnsweredIndex: null,
 };
 
@@ -68,6 +70,7 @@ const el = {
   hostBackBtn: document.getElementById("host-back-btn"),
   hostSetupError: document.getElementById("host-setup-error"),
   hostLobbyScreen: document.getElementById("host-lobby-screen"),
+  joinCodeDisplay: document.getElementById("join-code-display"),
   sessionCodeText: document.getElementById("session-code-text"),
   sessionShareLink: document.getElementById("session-share-link"),
   copyJoinLinkBtn: document.getElementById("copy-join-link-btn"),
@@ -76,6 +79,7 @@ const el = {
   hostLiveScreen: document.getElementById("host-live-screen"),
   hostProgress: document.getElementById("host-progress"),
   hostTimer: document.getElementById("host-timer"),
+  hostQuestionVisual: document.getElementById("host-question-visual"),
   hostQuestionText: document.getElementById("host-question-text"),
   hostAnswerGrid: document.getElementById("host-answer-grid"),
   hostNextBtn: document.getElementById("host-next-btn"),
@@ -92,6 +96,7 @@ const el = {
   playerProgress: document.getElementById("player-progress"),
   playerScore: document.getElementById("player-score"),
   playerTimer: document.getElementById("player-timer"),
+  playerQuestionVisual: document.getElementById("player-question-visual"),
   playerQuestionText: document.getElementById("player-question-text"),
   playerAnswerGrid: document.getElementById("player-answer-grid"),
   resultsScreen: document.getElementById("results-screen"),
@@ -291,9 +296,13 @@ async function createHostSession() {
 }
 
 function openHostLobby() {
+  stopUiTimer();
+  app.shownQuestionIndex = null;
+  app.lastQuestionStartedAt = null;
   showScreen(el.hostLobbyScreen);
   const link = buildJoinLink(app.session.join_code);
-  el.sessionCodeText.textContent = `Join Code: ${app.session.join_code}`;
+  if (el.joinCodeDisplay) el.joinCodeDisplay.textContent = app.session.join_code;
+  el.sessionCodeText.textContent = "Students enter this code on their phones.";
   el.sessionShareLink.textContent = `Share this join link with students: ${link}`;
   startPolling();
 }
@@ -348,6 +357,7 @@ async function joinSession() {
     app.sessionId = session.id;
     app.playerId = player.id;
     app.playerScore = 0;
+    app.shownQuestionIndex = null;
     showScreen(el.playerWaitingScreen);
     startPolling();
   } catch (err) {
@@ -367,12 +377,18 @@ async function tick() {
   if (!sessions.length) return;
   app.session = sessions[0];
   if (app.role === "host") {
-    if (app.session.status === "lobby") return renderHostLobby();
+    if (app.session.status === "lobby") {
+      stopUiTimer();
+      return renderHostLobby();
+    }
     if (app.session.status === "active") return renderHostLive();
     return renderResults();
   }
   if (app.role === "player") {
-    if (app.session.status === "lobby") return showScreen(el.playerWaitingScreen);
+    if (app.session.status === "lobby") {
+      stopUiTimer();
+      return showScreen(el.playerWaitingScreen);
+    }
     if (app.session.status === "active") return renderPlayerQuestion();
     return renderResults();
   }
@@ -398,34 +414,130 @@ function timeLeftSec() {
   return Math.max(0, app.session.time_limit_sec - Math.floor((Date.now() - startMs) / 1000));
 }
 
+function topicVisual(topic) {
+  const t = (topic || "").toLowerCase();
+  if (t.includes("nominativ")) return "🧩";
+  if (t.includes("akkusativ")) return "🎯";
+  if (t.includes("dativ")) return "🧭";
+  if (t.includes("modal")) return "🎛️";
+  if (t.includes("separable") || t.includes("trenn")) return "✂️";
+  if (t.includes("word") || t.includes("wort")) return "🔀";
+  return "🇩🇪";
+}
+
+function setTimerRing(elTimer, secondsLeft, total) {
+  if (!elTimer) return;
+  const pct = total > 0 ? Math.round((secondsLeft / total) * 100) : 0;
+  elTimer.dataset.progress = String(Math.max(0, Math.min(100, pct)));
+  elTimer.textContent = `${secondsLeft}s`;
+}
+
+function stopUiTimer() {
+  if (app.uiTimer) {
+    clearInterval(app.uiTimer);
+    app.uiTimer = null;
+  }
+}
+
+function refreshLiveUi() {
+  if (!app.session || app.session.status !== "active") return;
+  const left = timeLeftSec();
+  const total = app.session.time_limit_sec;
+  if (app.role === "host") {
+    setTimerRing(el.hostTimer, left, total);
+  }
+  if (app.role === "player") {
+    setTimerRing(el.playerTimer, left, total);
+    const answered = app.playerAnsweredIndex === app.session.current_question_index;
+    [...el.playerAnswerGrid.querySelectorAll(".answer-btn")].forEach((btn) => {
+      btn.disabled = answered || left <= 0;
+    });
+  }
+}
+
+function maybeStartUiTimer() {
+  if (app.session?.status !== "active") {
+    stopUiTimer();
+    return;
+  }
+  if (app.uiTimer) return;
+  app.uiTimer = setInterval(refreshLiveUi, 250);
+}
+
+function renderAnswerButtons(container, choices, options) {
+  const { disabled, onPick } = options;
+  container.innerHTML = "";
+  const labels = ["A", "B", "C", "D"];
+  choices.forEach((choice, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `answer-btn answer-shape${idx % 4}`;
+    btn.disabled = Boolean(disabled);
+    const inner = document.createElement("span");
+    inner.className = "answer-inner";
+    const lab = document.createElement("span");
+    lab.className = "answer-label";
+    lab.textContent = labels[idx] || String(idx + 1);
+    const text = document.createElement("span");
+    text.className = "answer-text";
+    text.textContent = choice;
+    inner.appendChild(lab);
+    inner.appendChild(text);
+    btn.appendChild(inner);
+    if (onPick) {
+      btn.onclick = () => onPick(choice, btn);
+    }
+    container.appendChild(btn);
+  });
+}
+
 async function renderHostLive() {
   showScreen(el.hostLiveScreen);
   const q = await getCurrentQuestion();
   if (!q) return;
-  el.hostProgress.textContent = `Question ${app.session.current_question_index}/${app.session.question_count}`;
-  el.hostTimer.textContent = `${timeLeftSec()}s`;
+  const idx = app.session.current_question_index;
+  const startedAt = app.session.question_started_at;
+  const left = timeLeftSec();
+  setTimerRing(el.hostTimer, left, app.session.time_limit_sec);
+  if (app.shownQuestionIndex === idx && app.lastQuestionStartedAt === startedAt) {
+    maybeStartUiTimer();
+    return;
+  }
+  app.shownQuestionIndex = idx;
+  app.lastQuestionStartedAt = startedAt;
+  el.hostProgress.textContent = `Question ${idx}/${app.session.question_count}`;
+  if (el.hostQuestionVisual) el.hostQuestionVisual.textContent = topicVisual(q.topic);
   el.hostQuestionText.textContent = q.question;
-  el.hostAnswerGrid.innerHTML = q.choices.map((c) => `<button class="answer-btn" disabled>${c}</button>`).join("");
+  renderAnswerButtons(el.hostAnswerGrid, q.choices, { disabled: true });
+  maybeStartUiTimer();
 }
 
 async function renderPlayerQuestion() {
   showScreen(el.playerQuestionScreen);
   const q = await getCurrentQuestion();
   if (!q) return;
-  el.playerProgress.textContent = `Question ${app.session.current_question_index}/${app.session.question_count}`;
+  const idx = app.session.current_question_index;
+  const startedAt = app.session.question_started_at;
+  const left = timeLeftSec();
+  setTimerRing(el.playerTimer, left, app.session.time_limit_sec);
+  if (app.shownQuestionIndex === idx && app.lastQuestionStartedAt === startedAt) {
+    maybeStartUiTimer();
+    return;
+  }
+  app.shownQuestionIndex = idx;
+  app.lastQuestionStartedAt = startedAt;
+  el.playerProgress.textContent = `Question ${idx}/${app.session.question_count}`;
   el.playerScore.textContent = `Score: ${app.playerScore}`;
-  el.playerTimer.textContent = `${timeLeftSec()}s`;
+  if (el.playerQuestionVisual) el.playerQuestionVisual.textContent = topicVisual(q.topic);
   el.playerQuestionText.textContent = q.question;
-  el.playerAnswerGrid.innerHTML = "";
   const answeredAlready = app.playerAnsweredIndex === app.session.current_question_index;
-  q.choices.forEach((choice) => {
-    const b = document.createElement("button");
-    b.className = "answer-btn";
-    b.textContent = choice;
-    b.disabled = answeredAlready || timeLeftSec() <= 0;
-    b.onclick = () => submitAnswer(q, choice);
-    el.playerAnswerGrid.appendChild(b);
+  renderAnswerButtons(el.playerAnswerGrid, q.choices, {
+    disabled: answeredAlready || left <= 0,
+    onPick: (choice) => {
+      submitAnswer(q, choice);
+    },
   });
+  maybeStartUiTimer();
 }
 
 async function submitAnswer(q, selected) {
@@ -444,27 +556,44 @@ async function submitAnswer(q, selected) {
   app.playerScore += points;
   await sb(`live_players?id=eq.${app.playerId}`, "PATCH", { total_score: app.playerScore });
   app.playerAnsweredIndex = app.session.current_question_index;
-  renderPlayerQuestion();
+  [...el.playerAnswerGrid.querySelectorAll(".answer-btn")].forEach((btn) => {
+    const label = btn.querySelector(".answer-text");
+    const text = label ? label.textContent : btn.textContent;
+    btn.disabled = true;
+    if (text === q.answer) btn.classList.add("answer-correct");
+    if (text === selected && text !== q.answer) btn.classList.add("answer-wrong");
+  });
+  el.playerScore.textContent = `Score: ${app.playerScore}`;
 }
 
 async function renderResults() {
   showScreen(el.resultsScreen);
   clearInterval(app.pollId);
+  stopUiTimer();
   const players = await sb(`live_players?session_id=eq.${app.sessionId}&order=total_score.desc,created_at.asc&select=*`);
   el.resultsTitle.textContent = `Session ${app.session.join_code} completed.`;
   el.resultsLeaderboard.innerHTML = players.length
-    ? players.map((p, i) => `<article class="review-item"><p><strong>#${i + 1} ${p.nickname}</strong></p><p>Score: ${p.total_score}</p></article>`).join("")
+    ? players
+        .map((p, i) => {
+          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🏅";
+          const podium = i === 0 ? "podium-1" : i === 1 ? "podium-2" : i === 2 ? "podium-3" : "";
+          return `<article class="review-item ${podium}"><p class="podium-line"><span class="podium-medal">${medal}</span><strong>#${i + 1} ${p.nickname}</strong></p><p class="podium-score">${p.total_score} pts</p></article>`;
+        })
+        .join("")
     : '<article class="review-item"><p>No results.</p></article>';
 }
 
 function resetHome() {
   clearInterval(app.pollId);
+  stopUiTimer();
   app.role = null;
   app.session = null;
   app.sessionId = null;
   app.playerId = null;
   app.playerScore = 0;
   app.playerAnsweredIndex = null;
+  app.shownQuestionIndex = null;
+  app.lastQuestionStartedAt = null;
   showScreen(el.roleScreen);
 }
 

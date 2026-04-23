@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: "Sora", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --bg: #0f1224;
   --card: #ffffff;
   --text: #1e2444;
@@ -10,6 +10,10 @@
   --success: #1f9d57;
   --danger: #cc2445;
   --border: #dde3ff;
+  --kahoot-red: #e21b3c;
+  --kahoot-blue: #1368ce;
+  --kahoot-yellow: #d89e00;
+  --kahoot-green: #26890c;
 }
 
 * {
@@ -40,11 +44,38 @@ body {
 
 .hero h1 {
   margin-bottom: 8px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .hero p {
   margin-top: 0;
   color: #c7ceff;
+}
+
+.brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.brand-badge {
+  background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+  color: #1a1a2e;
+  font-weight: 800;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(255, 107, 107, 0.35);
+}
+
+.brand-tagline {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b8c2ff;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .card {
@@ -54,6 +85,7 @@ body {
   padding: 22px;
   box-shadow: 0 18px 45px rgba(16, 20, 56, 0.35);
   margin-bottom: 14px;
+  backdrop-filter: blur(6px);
 }
 
 .hidden {
@@ -126,6 +158,10 @@ input {
   background: #e9edff;
   color: #2f3564;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.inline-actions .btn {
+  margin-top: 0;
 }
 
 .btn.primary {
@@ -222,6 +258,17 @@ input {
 
 .timer {
   color: var(--danger);
+  min-width: 52px;
+  text-align: center;
+}
+
+.timer-ring {
+  --p: 100;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: conic-gradient(var(--danger) calc(var(--p) * 1%), #f0f2ff 0);
+  color: #2a2f55;
+  font-variant-numeric: tabular-nums;
 }
 
 .pill-row {
@@ -242,41 +289,112 @@ input {
 .answer-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
   margin-top: 16px;
 }
 
 .answer-btn {
-  border: 1px solid #c9d5ff;
-  border-radius: 12px;
-  padding: 16px;
-  background: linear-gradient(180deg, #f7f9ff 0%, #eef3ff 100%);
+  position: relative;
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  min-height: 88px;
   text-align: left;
   font-size: 1rem;
+  font-family: inherit;
+  font-weight: 700;
+  color: #fff;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  overflow: hidden;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.12);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
-.answer-btn:hover {
-  border-color: #b7c4ff;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(62, 83, 160, 0.12);
+.answer-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.03);
+  box-shadow: 0 14px 0 rgba(0, 0, 0, 0.14);
 }
 
-.answer-btn.correct {
-  background: #e7f8ee;
-  border-color: #99ddb7;
-  color: #15673a;
+.answer-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.12);
 }
 
-.answer-btn.wrong {
-  background: #ffeef2;
-  border-color: #ffc1cd;
-  color: #9e1732;
+.answer-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 16px 18px;
+  min-height: 100%;
+}
+
+.answer-label {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.22);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.answer-text {
+  flex: 1;
+  line-height: 1.35;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.answer-shape0 {
+  background: linear-gradient(145deg, #ff4d6d, var(--kahoot-red));
+}
+.answer-shape1 {
+  background: linear-gradient(145deg, #3d8ef5, var(--kahoot-blue));
+}
+.answer-shape2 {
+  background: linear-gradient(145deg, #ffc93c, var(--kahoot-yellow));
+  color: #3a3200;
+}
+.answer-shape2 .answer-label {
+  background: rgba(0, 0, 0, 0.08);
+  color: #3a3200;
+}
+.answer-shape3 {
+  background: linear-gradient(145deg, #3ac01a, var(--kahoot-green));
+}
+
+.answer-btn.answer-correct::after,
+.answer-btn.answer-wrong::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.answer-btn.answer-correct::after {
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.55);
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 55%);
+}
+
+.answer-btn.answer-wrong::after {
+  background: repeating-linear-gradient(
+    -35deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.12) 8px,
+    rgba(0, 0, 0, 0.08) 8px,
+    rgba(0, 0, 0, 0.08) 16px
+  );
+  mix-blend-mode: overlay;
 }
 
 .answer-btn:disabled {
   cursor: not-allowed;
+  opacity: 0.85;
+  filter: saturate(0.92);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.1);
 }
 
 .review-list {
@@ -291,6 +409,92 @@ input {
   border-radius: 10px;
   padding: 12px;
   background: #fcfdff;
+}
+
+.podium-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.podium-medal {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.podium-score {
+  margin: 6px 0 0;
+  font-weight: 800;
+  color: #3a4588;
+}
+
+.podium-1 {
+  border-color: #f0c14b;
+  background: linear-gradient(135deg, #fff9e6, #fff3cc);
+  box-shadow: 0 10px 24px rgba(240, 193, 75, 0.25);
+}
+
+.podium-2 {
+  border-color: #c7d2ea;
+  background: linear-gradient(135deg, #f7f9ff, #eef2ff);
+}
+
+.podium-3 {
+  border-color: #e0b89a;
+  background: linear-gradient(135deg, #fff6f0, #ffe8dc);
+}
+
+.join-code-display {
+  font-size: clamp(2rem, 8vw, 3rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+  padding: 16px;
+  margin: 8px 0 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eef2ff, #e8f0ff);
+  border: 1px solid var(--border);
+  color: #2a3366;
+}
+
+.question-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  margin: 8px 0 12px;
+  font-size: 2.75rem;
+  line-height: 1;
+}
+
+.waiting-pulse {
+  width: 64px;
+  height: 64px;
+  margin: 12px auto 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #a8b8ff 0%, transparent 70%);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+#host-question-text,
+#player-question-text {
+  font-size: clamp(1.15rem, 3.5vw, 1.45rem);
+  line-height: 1.35;
+  margin: 0 0 6px;
 }
 
 .review-item.good {

@@ -4,11 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>German A1 Quiz Arena</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="container">
       <header class="hero">
+        <div class="brand-row">
+          <span class="brand-badge">A1</span>
+          <span class="brand-tagline">Live Quiz</span>
+        </div>
         <h1>German A1 Quiz Arena</h1>
         <p>Live class quizzes with join code and leaderboard.</p>
       </header>
@@ -57,6 +67,7 @@
 
       <section id="host-lobby-screen" class="card hidden">
         <h2>Host Lobby</h2>
+        <div id="join-code-display" class="join-code-display" aria-hidden="true"></div>
         <p id="session-code-text"></p>
         <p id="session-share-link" class="hint"></p>
         <div class="inline-actions">
@@ -70,8 +81,9 @@
       <section id="host-live-screen" class="card hidden">
         <div class="quiz-topbar">
           <span id="host-progress">Question 1/10</span>
-          <span id="host-timer" class="timer">20s</span>
+          <span id="host-timer" class="timer timer-ring" data-progress="100">20s</span>
         </div>
+        <div id="host-question-visual" class="question-visual" aria-hidden="true"></div>
         <h2 id="host-question-text"></h2>
         <div id="host-answer-grid" class="answer-grid"></div>
         <div class="inline-actions">
@@ -95,6 +107,7 @@
 
       <section id="player-waiting-screen" class="card hidden">
         <h2>Waiting for Teacher</h2>
+        <div class="waiting-pulse" aria-hidden="true"></div>
         <p id="waiting-message">Host has not started yet.</p>
       </section>
 
@@ -102,8 +115,9 @@
         <div class="quiz-topbar">
           <span id="player-progress"></span>
           <span id="player-score">Score: 0</span>
-          <span id="player-timer" class="timer">20s</span>
+          <span id="player-timer" class="timer timer-ring" data-progress="100">20s</span>
         </div>
+        <div id="player-question-visual" class="question-visual" aria-hidden="true"></div>
         <h2 id="player-question-text"></h2>
         <div id="player-answer-grid" class="answer-grid"></div>
       </section>
