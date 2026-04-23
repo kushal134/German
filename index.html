@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>German A1 Quiz Arena</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <h1>German A1 Quiz Arena</h1>
+        <p>Live class quizzes with join code and leaderboard.</p>
+      </header>
+
+      <section id="role-screen" class="card">
+        <h2>Start Session</h2>
+        <div class="role-grid">
+          <button id="open-host-btn" class="role-card role-host">
+            <span class="role-title">Teacher</span>
+            <span class="role-subtitle">Create and run a live quiz</span>
+          </button>
+          <button id="open-join-btn" class="role-card role-student">
+            <span class="role-title">Student</span>
+            <span class="role-subtitle">Join quickly with code + nickname</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="host-setup-screen" class="card hidden">
+        <h2>Host Setup</h2>
+        <details class="ai-panel">
+          <summary>Deployment Note</summary>
+          <p class="hint">This version expects Vercel server API routes to be configured. Students only need join code + nickname.</p>
+        </details>
+
+        <div id="topic-list" class="topic-list"></div>
+        <div class="settings-grid">
+          <label>Questions<select id="question-count"><option value="8">8</option><option value="10" selected>10</option><option value="12">12</option><option value="15">15</option></select></label>
+          <label>Time per question<select id="time-limit"><option value="15">15s</option><option value="20" selected>20s</option><option value="30">30s</option></select></label>
+          <label>Difficulty<select id="difficulty"><option value="easy">Easy</option><option value="mixed" selected>Mixed</option><option value="hard">Hard</option></select></label>
+        </div>
+        <details class="ai-panel">
+          <summary>Optional AI Generation</summary>
+          <div class="settings-grid">
+            <label>API Key<input id="api-key" type="password" placeholder="sk-..." /></label>
+            <label>API Base URL<input id="api-base" type="text" value="https://api.openai.com/v1" /></label>
+            <label>Model<input id="api-model" type="text" value="gpt-4o-mini" /></label>
+          </div>
+        </details>
+        <div class="inline-actions">
+          <button id="create-session-btn" class="btn primary">Create Live Session</button>
+          <button id="host-back-btn" class="btn">Back</button>
+        </div>
+        <p id="host-setup-error" class="error"></p>
+      </section>
+
+      <section id="host-lobby-screen" class="card hidden">
+        <h2>Host Lobby</h2>
+        <p id="session-code-text"></p>
+        <p id="session-share-link" class="hint"></p>
+        <div class="inline-actions">
+          <button id="copy-join-link-btn" class="btn">Copy Join Link</button>
+          <button id="start-live-quiz-btn" class="btn primary">Start Quiz</button>
+        </div>
+        <h3>Players</h3>
+        <div id="host-player-list" class="review-list"></div>
+      </section>
+
+      <section id="host-live-screen" class="card hidden">
+        <div class="quiz-topbar">
+          <span id="host-progress">Question 1/10</span>
+          <span id="host-timer" class="timer">20s</span>
+        </div>
+        <h2 id="host-question-text"></h2>
+        <div id="host-answer-grid" class="answer-grid"></div>
+        <div class="inline-actions">
+          <button id="host-next-btn" class="btn primary">Next Question</button>
+          <button id="host-end-btn" class="btn">End Quiz</button>
+        </div>
+      </section>
+
+      <section id="join-screen" class="card hidden">
+        <h2>Join Quiz</h2>
+        <div class="settings-grid">
+          <label>Join Code<input id="join-code" type="text" placeholder="AB12CD" /></label>
+          <label>Nickname<input id="join-nickname" type="text" placeholder="Your name" /></label>
+        </div>
+        <div class="inline-actions">
+          <button id="join-session-btn" class="btn primary">Join</button>
+          <button id="join-back-btn" class="btn">Back</button>
+        </div>
+        <p id="join-error" class="error"></p>
+      </section>
+
+      <section id="player-waiting-screen" class="card hidden">
+        <h2>Waiting for Teacher</h2>
+        <p id="waiting-message">Host has not started yet.</p>
+      </section>
+
+      <section id="player-question-screen" class="card hidden">
+        <div class="quiz-topbar">
+          <span id="player-progress"></span>
+          <span id="player-score">Score: 0</span>
+          <span id="player-timer" class="timer">20s</span>
+        </div>
+        <h2 id="player-question-text"></h2>
+        <div id="player-answer-grid" class="answer-grid"></div>
+      </section>
+
+      <section id="results-screen" class="card hidden">
+        <h2>Session Results</h2>
+        <p id="results-title"></p>
+        <div id="results-leaderboard" class="review-list"></div>
+        <button id="restart-btn" class="btn primary">Back To Home</button>
+      </section>
+    </main>
+
+    <script src="./live.js"></script>
+  </body>
+</html>
