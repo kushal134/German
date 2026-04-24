@@ -76,6 +76,8 @@
         </div>
         <h3>Players</h3>
         <div id="host-player-list" class="review-list"></div>
+        <h3>Question Preview (Host Only)</h3>
+        <div id="host-question-preview" class="review-list"></div>
       </section>
 
       <section id="host-live-screen" class="card hidden">
@@ -126,10 +128,16 @@
         <h2>Session Results</h2>
         <p id="results-title"></p>
         <div id="results-leaderboard" class="review-list"></div>
+        <section id="host-insights-panel" class="hidden">
+          <h3>Host Insights</h3>
+          <div id="host-insights-summary" class="review-list"></div>
+          <button id="download-insights-btn" class="btn hidden">Download Insights PDF</button>
+        </section>
         <button id="restart-btn" class="btn primary">Back To Home</button>
       </section>
     </main>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="./live.js"></script>
   </body>
 </html>

@@ -52,6 +52,7 @@ const app = {
   shownQuestionIndex: null,
   lastQuestionStartedAt: null,
   playerAnsweredIndex: null,
+  insights: null,
 };
 
 const el = {
@@ -102,6 +103,10 @@ const el = {
   resultsScreen: document.getElementById("results-screen"),
   resultsTitle: document.getElementById("results-title"),
   resultsLeaderboard: document.getElementById("results-leaderboard"),
+  hostQuestionPreview: document.getElementById("host-question-preview"),
+  hostInsightsPanel: document.getElementById("host-insights-panel"),
+  hostInsightsSummary: document.getElementById("host-insights-summary"),
+  downloadInsightsBtn: document.getElementById("download-insights-btn"),
   restartBtn: document.getElementById("restart-btn"),
 };
 
@@ -397,9 +402,18 @@ async function tick() {
 async function renderHostLobby() {
   showScreen(el.hostLobbyScreen);
   const players = await sb(`live_players?session_id=eq.${app.sessionId}&order=created_at.asc&select=*`);
+  const questions = await sb(`live_questions?session_id=eq.${app.sessionId}&order=order_index.asc&select=*`);
   el.hostPlayerList.innerHTML = players.length
     ? players.map((p) => `<article class="review-item"><p>${p.nickname}</p></article>`).join("")
     : '<article class="review-item"><p>No players yet.</p></article>';
+  el.hostQuestionPreview.innerHTML = questions.length
+    ? questions
+        .map(
+          (q) =>
+            `<article class="review-item"><p><strong>Q${q.order_index}</strong> (${q.topic})</p><p>${q.question}</p></article>`
+        )
+        .join("")
+    : '<article class="review-item"><p>Questions are being prepared...</p></article>';
 }
 
 async function getCurrentQuestion() {
@@ -581,6 +595,133 @@ async function renderResults() {
         })
         .join("")
     : '<article class="review-item"><p>No results.</p></article>';
+
+  if (app.role === "host") {
+    app.insights = await buildInsights();
+    renderInsightsSummary(app.insights);
+    el.hostInsightsPanel.classList.remove("hidden");
+    el.downloadInsightsBtn.classList.remove("hidden");
+  } else {
+    el.hostInsightsPanel.classList.add("hidden");
+    el.downloadInsightsBtn.classList.add("hidden");
+  }
+}
+
+async function buildInsights() {
+  const [questions, answers, players] = await Promise.all([
+    sb(`live_questions?session_id=eq.${app.sessionId}&order=order_index.asc&select=*`),
+    sb(`live_answers?session_id=eq.${app.sessionId}&select=*`),
+    sb(`live_players?session_id=eq.${app.sessionId}&select=*`),
+  ]);
+
+  const byIndex = new Map();
+  questions.forEach((q) => byIndex.set(q.order_index, q));
+  const questionStats = new Map();
+  answers.forEach((a) => {
+    const q = byIndex.get(a.question_index);
+    if (!q) return;
+    const key = `${q.order_index}`;
+    if (!questionStats.has(key)) {
+      questionStats.set(key, { orderIndex: q.order_index, topic: q.topic, question: q.question, total: 0, correct: 0 });
+    }
+    const stat = questionStats.get(key);
+    stat.total += 1;
+    if (a.is_correct) stat.correct += 1;
+  });
+
+  const questionRows = [...questionStats.values()].map((s) => ({
+    ...s,
+    correctRate: s.total ? s.correct / s.total : 0,
+  }));
+  const topicMap = new Map();
+  questionRows.forEach((row) => {
+    if (!topicMap.has(row.topic)) topicMap.set(row.topic, { topic: row.topic, total: 0, correct: 0 });
+    const t = topicMap.get(row.topic);
+    t.total += row.total;
+    t.correct += row.correct;
+  });
+  const topicRows = [...topicMap.values()].map((t) => ({
+    ...t,
+    correctRate: t.total ? t.correct / t.total : 0,
+  }));
+
+  topicRows.sort((a, b) => a.correctRate - b.correctRate);
+  questionRows.sort((a, b) => a.correctRate - b.correctRate);
+
+  return {
+    playerCount: players.length,
+    answerCount: answers.length,
+    hardestTopic: topicRows[0] || null,
+    easiestTopic: topicRows[topicRows.length - 1] || null,
+    hardestQuestion: questionRows[0] || null,
+    easiestQuestion: questionRows[questionRows.length - 1] || null,
+    topicRows,
+    questionRows,
+  };
+}
+
+function pct(value) {
+  return `${Math.round((value || 0) * 100)}%`;
+}
+
+function renderInsightsSummary(insights) {
+  if (!insights) return;
+  const cards = [];
+  if (insights.hardestTopic) {
+    cards.push(
+      `<article class="insight-card"><p class="insight-title">Hardest Topic: ${insights.hardestTopic.topic}</p><p class="insight-sub">Correct rate: ${pct(insights.hardestTopic.correctRate)}. Focus revision here.</p></article>`
+    );
+  }
+  if (insights.easiestTopic) {
+    cards.push(
+      `<article class="insight-card"><p class="insight-title">Easiest Topic: ${insights.easiestTopic.topic}</p><p class="insight-sub">Correct rate: ${pct(insights.easiestTopic.correctRate)}.</p></article>`
+    );
+  }
+  if (insights.hardestQuestion) {
+    cards.push(
+      `<article class="insight-card"><p class="insight-title">Hardest Question (Q${insights.hardestQuestion.orderIndex})</p><p>${insights.hardestQuestion.question}</p><p class="insight-sub">Correct rate: ${pct(insights.hardestQuestion.correctRate)}</p></article>`
+    );
+  }
+  if (insights.easiestQuestion) {
+    cards.push(
+      `<article class="insight-card"><p class="insight-title">Easiest Question (Q${insights.easiestQuestion.orderIndex})</p><p>${insights.easiestQuestion.question}</p><p class="insight-sub">Correct rate: ${pct(insights.easiestQuestion.correctRate)}</p></article>`
+    );
+  }
+  el.hostInsightsSummary.innerHTML = cards.join("");
+}
+
+function downloadInsightsPdf() {
+  if (!app.insights) return;
+  const jspdfRef = window.jspdf;
+  if (!jspdfRef || !jspdfRef.jsPDF) {
+    alert("PDF library not loaded yet. Please try again.");
+    return;
+  }
+  const { jsPDF } = jspdfRef;
+  const doc = new jsPDF();
+  let y = 16;
+  const line = (text) => {
+    doc.text(text, 14, y);
+    y += 7;
+    if (y > 280) {
+      doc.addPage();
+      y = 16;
+    }
+  };
+  line(`German A1 Quiz Insights - Session ${app.session.join_code}`);
+  line(`Players: ${app.insights.playerCount} | Answers: ${app.insights.answerCount}`);
+  y += 3;
+  line(`Hardest Topic: ${app.insights.hardestTopic ? `${app.insights.hardestTopic.topic} (${pct(app.insights.hardestTopic.correctRate)})` : "N/A"}`);
+  line(`Easiest Topic: ${app.insights.easiestTopic ? `${app.insights.easiestTopic.topic} (${pct(app.insights.easiestTopic.correctRate)})` : "N/A"}`);
+  y += 3;
+  line("Topic performance:");
+  app.insights.topicRows.forEach((t) => line(`- ${t.topic}: ${pct(t.correctRate)} (${t.correct}/${t.total})`));
+  y += 3;
+  line("Question difficulty (hardest to easiest):");
+  app.insights.questionRows.forEach((q) =>
+    line(`- Q${q.orderIndex}: ${pct(q.correctRate)} (${q.correct}/${q.total}) | ${q.question}`)
+  );
+  doc.save(`quiz-insights-${app.session.join_code}.pdf`);
 }
 
 function resetHome() {
@@ -594,6 +735,10 @@ function resetHome() {
   app.playerAnsweredIndex = null;
   app.shownQuestionIndex = null;
   app.lastQuestionStartedAt = null;
+  app.insights = null;
+  el.hostInsightsPanel.classList.add("hidden");
+  el.downloadInsightsBtn.classList.add("hidden");
+  el.hostInsightsSummary.innerHTML = "";
   showScreen(el.roleScreen);
 }
 
@@ -620,6 +765,7 @@ el.startLiveQuizBtn.addEventListener("click", startLiveQuiz);
 el.hostNextBtn.addEventListener("click", hostNextQuestion);
 el.hostEndBtn.addEventListener("click", hostEndQuiz);
 el.joinSessionBtn.addEventListener("click", joinSession);
+el.downloadInsightsBtn.addEventListener("click", downloadInsightsPdf);
 el.restartBtn.addEventListener("click", resetHome);
 
 renderTopicCheckboxes();
